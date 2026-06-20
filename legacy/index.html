@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Forest Clearing — /loop test</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; background: #87b9e0; }
+    canvas { display: block; }
+
+    #log {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      max-width: 320px;
+      max-height: 40vh;
+      overflow-y: auto;
+      padding: 12px 14px;
+      font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+      color: #eaf6ff;
+      background: rgba(12, 28, 20, 0.55);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      pointer-events: auto; /* allow scrolling the log */
+      user-select: none;
+    }
+    #log::-webkit-scrollbar { width: 7px; }
+    #log::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.25); border-radius: 4px; }
+    #log::-webkit-scrollbar-track { background: transparent; }
+    #log h1 {
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      opacity: 0.85;
+      margin-bottom: 8px;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      background: rgba(12, 28, 20, 0.85);
+      padding-bottom: 6px;
+    }
+    #log .entry { opacity: 0.92; }
+    #log .entry + .entry { margin-top: 3px; }
+    #log .seed { opacity: 0.6; }
+
+    #hint {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 7px 14px;
+      font: 12px/1 ui-sans-serif, system-ui, sans-serif;
+      color: rgba(255, 255, 255, 0.85);
+      background: rgba(12, 28, 20, 0.45);
+      backdrop-filter: blur(8px);
+      border-radius: 999px;
+      pointer-events: none;
+      user-select: none;
+    }
+  </style>
+
+  <!--
+    ============================================================
+    /loop test scene — "Forest Clearing"
+    ------------------------------------------------------------
+    HOW THE LOOP ADDS THINGS:
+    Each loop iteration, add ONE new surprising element to the
+    scene. Simple additions can go inline in the marked region
+    below (populateScene); larger ones are welcome to live in
+    their own files (e.g. ./modules/<thing>.js imported here, a
+    shader file, etc.). Append a line to the on-screen log via
+    logEntry("...") for each addition.
+
+    Textures/materials may be generated locally with codex
+    ($imagegen) and saved next to this file as ./assets/<name>.png,
+    then loaded with `texLoader.load('./assets/<name>.png')`.
+    ============================================================
+  -->
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="log">
+    <h1>Loop Log</h1>
+    <div class="entry seed">Seed: forest clearing planted.</div>
+  </div>
+  <div id="hint">drag to orbit · scroll to zoom</div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { createButterflies } from './modules/butterflies.js';
+    import { createDeer } from './modules/deer.js';
+    import { createDayNight } from './modules/daynight.js';
+    import { createCampsite } from './modules/campsite.js';
+    import { createBirds } from './modules/birds.js';
+    import { createCottage } from './modules/cottage.js';
+    import { createWaterfall } from './modules/waterfall.js';
+    import { createClouds } from './modules/clouds.js';
+    import { createKoi } from './modules/koi.js';
+    import { createGarden } from './modules/garden.js';
+    import { createMushrooms } from './modules/mushrooms.js';
+    import { createRabbits } from './modules/rabbits.js';
+    import { createMeteors } from './modules/meteors.js';
+    import { createAurora } from './modules/aurora.js';
+    import { createPetals } from './modules/petals.js';
+    import { createBridge } from './modules/bridge.js';
+    import { createWaterWheel } from './modules/waterwheel.js';
+    import { createStringLights } from './modules/stringlights.js';
+    import { createOwl } from './modules/owl.js';
+    import { createWindmill } from './modules/windmill.js';
+    import { createFox } from './modules/fox.js';
+    import { createDragonflies } from './modules/dragonflies.js';
+    import { createReeds } from './modules/reeds.js';
+    import { createSwing } from './modules/swing.js';
+    import { createLilyPads } from './modules/lilypads.js';
+    import { createScarecrow } from './modules/scarecrow.js';
+    import { createBees } from './modules/bees.js';
+    import { createWell } from './modules/well.js';
+
+    // ---- Shared handles the loop can use ---------------------
+    const texLoader = new THREE.TextureLoader();
+
+    // Per-frame animation callbacks. Loop additions that need to
+    // move/animate can push a fn(t) here; it's called every frame
+    // with elapsed seconds. Keeps animated additions decoupled.
+    const tickers = [];
+
+    // Shared environment state, published by the day-night cycle and
+    // read by modules that react to time-of-day (e.g. the cottage).
+    const env = { daylight: 1, night01: 0, elevation: 1 };
+
+    function logEntry(text) {
+      const el = document.createElement('div');
+      el.className = 'entry';
+      el.textContent = text;
+      // Newest first: insert just under the (sticky) header.
+      const log = document.getElementById('log');
+      const header = log.querySelector('h1');
+      log.insertBefore(el, header.nextSibling);
+    }
+    // expose for convenience / debugging
+    window.logEntry = logEntry;
+
+    // ---- Renderer / scene / camera ---------------------------
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#87b9e0');
+    scene.fog = new THREE.Fog('#9fc6e6', 28, 70);
+
+    const camera = new THREE.PerspectiveCamera(
+      55, window.innerWidth / window.innerHeight, 0.1, 200
+    );
+    camera.position.set(10, 7, 14);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.maxPolarAngle = Math.PI / 2 - 0.04; // keep camera above ground
+    controls.minDistance = 5;
+    controls.maxDistance = 45;
+    controls.target.set(0, 1, 0);
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.35; // gentle idle drift
+
+    // ---- Lighting --------------------------------------------
+    const hemi = new THREE.HemisphereLight('#cfe8ff', '#3a5a32', 0.85);
+    scene.add(hemi);
+
+    const sun = new THREE.DirectionalLight('#fff4d6', 1.5);
+    sun.position.set(14, 20, 8);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 60;
+    sun.shadow.camera.left = -25;
+    sun.shadow.camera.right = 25;
+    sun.shadow.camera.top = 25;
+    sun.shadow.camera.bottom = -25;
+    sun.shadow.bias = -0.0004;
+    scene.add(sun);
+
+    // ---- Ground ----------------------------------------------
+    const ground = new THREE.Mesh(
+      new THREE.CircleGeometry(40, 64),
+      new THREE.MeshStandardMaterial({ color: '#5a8c3e', roughness: 1 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // ---- Reusable low-poly tree ------------------------------
+    function makeTree({ x = 0, z = 0, scale = 1, hue = '#2f6d34' } = {}) {
+      const tree = new THREE.Group();
+
+      const trunk = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.22, 0.32, 2.2, 7),
+        new THREE.MeshStandardMaterial({ color: '#6b4a2b', roughness: 0.9 })
+      );
+      trunk.position.y = 1.1;
+      trunk.castShadow = true;
+      tree.add(trunk);
+
+      const foliageMat = new THREE.MeshStandardMaterial({ color: hue, roughness: 0.85, flatShading: true });
+      const tiers = [
+        { y: 2.5, r: 1.5, h: 1.8 },
+        { y: 3.5, r: 1.15, h: 1.5 },
+        { y: 4.4, r: 0.8, h: 1.2 },
+      ];
+      for (const t of tiers) {
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(t.r, t.h, 8), foliageMat);
+        cone.position.y = t.y;
+        cone.castShadow = true;
+        tree.add(cone);
+      }
+
+      tree.position.set(x, 0, z);
+      tree.scale.setScalar(scale);
+      tree.rotation.y = (x * 1.7 + z * 0.9) % (Math.PI * 2); // varied, deterministic
+      return tree;
+    }
+
+    // ---- Reusable low-poly rock ------------------------------
+    function makeRock({ x = 0, z = 0, scale = 1 } = {}) {
+      const rock = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(0.6, 0),
+        new THREE.MeshStandardMaterial({ color: '#8a8d92', roughness: 1, flatShading: true })
+      );
+      rock.position.set(x, 0.3 * scale, z);
+      rock.scale.set(scale, scale * 0.7, scale);
+      rock.rotation.set(x, z, x + z);
+      rock.castShadow = true;
+      rock.receiveShadow = true;
+      return rock;
+    }
+
+    // ---- Hot-air balloon (iteration 1) -----------------------
+    // Procedural striped envelope via a canvas texture (gores),
+    // a wicker basket, and rigging lines. Returns { group, tick }.
+    function makeBalloon({ x = 0, z = 0, height = 16, colors = ['#e84c3d', '#f4d03f'] } = {}) {
+      // Striped "gore" texture — vertical bands wrapping the sphere.
+      const c = document.createElement('canvas');
+      c.width = 256; c.height = 8;
+      const ctx = c.getContext('2d');
+      const gores = 12;
+      for (let i = 0; i < gores; i++) {
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.fillRect((i / gores) * c.width, 0, c.width / gores + 1, c.height);
+      }
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.wrapS = THREE.RepeatWrapping;
+
+      const group = new THREE.Group();
+
+      const envelope = new THREE.Mesh(
+        new THREE.SphereGeometry(2.2, 24, 20),
+        new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6, metalness: 0 })
+      );
+      envelope.scale.set(1, 1.25, 1);
+      envelope.position.y = 2.6;
+      envelope.castShadow = true;
+      group.add(envelope);
+
+      // Throat (cone tapering toward the basket).
+      const throat = new THREE.Mesh(
+        new THREE.ConeGeometry(0.9, 1.1, 16, 1, true),
+        new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: 0.6 })
+      );
+      throat.position.y = 0.55;
+      throat.rotation.x = Math.PI;
+      group.add(throat);
+
+      // Wicker basket.
+      const basket = new THREE.Mesh(
+        new THREE.BoxGeometry(0.85, 0.7, 0.85),
+        new THREE.MeshStandardMaterial({ color: '#9c6b3f', roughness: 1 })
+      );
+      basket.position.y = -0.35;
+      basket.castShadow = true;
+      group.add(basket);
+
+      // Rigging lines from basket corners up to the throat.
+      const rigMat = new THREE.LineBasicMaterial({ color: '#3a2a1a' });
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+        const geo = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(sx * 0.4, -0.1, sz * 0.4),
+          new THREE.Vector3(sx * 0.3, 1.0, sz * 0.3),
+        ]);
+        group.add(new THREE.Line(geo, rigMat));
+      }
+
+      group.position.set(x, height, z);
+
+      // Gentle bob + slow circular drift + slight sway.
+      const tick = (t) => {
+        group.position.y = height + Math.sin(t * 0.6) * 0.6;
+        group.position.x = x + Math.cos(t * 0.08) * 6;
+        group.position.z = z + Math.sin(t * 0.08) * 6;
+        group.rotation.z = Math.sin(t * 0.5) * 0.04;
+        group.rotation.y = t * 0.05;
+      };
+      return { group, tick };
+    }
+
+    // ---- Pond (iteration 2) ----------------------------------
+    // Uses a codex-generated top-down water texture (assets/pond.png),
+    // sits just above the ground, with a subtle shimmer. Returns { mesh, tick }.
+    function makePond({ x = 0, z = 0, radius = 2.6 } = {}) {
+      const tex = texLoader.load('./assets/pond.png');
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+
+      const mesh = new THREE.Mesh(
+        new THREE.CircleGeometry(radius, 48),
+        new THREE.MeshStandardMaterial({ map: tex, roughness: 0.25, metalness: 0.0 })
+      );
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.set(x, 0.02, z); // just above ground to avoid z-fighting
+      mesh.receiveShadow = true;
+
+      // Subtle shimmer: gently drift the texture in a tiny circle.
+      const tick = (t) => {
+        tex.offset.x = Math.sin(t * 0.3) * 0.01;
+        tex.offset.y = Math.cos(t * 0.23) * 0.01;
+      };
+      return { mesh, tick };
+    }
+
+    // ---- Will-o'-the-wisp (iteration 4) ----------------------
+    // A glowing orb rendered with a custom GLSL ShaderMaterial:
+    // animated fresnel rim-glow + a drifting two-color core.
+    // Returns { group, tick }.
+    function makeWisp({ x = 0, y = 2.4, z = 0, colorA = '#7df9ff', colorB = '#b06bff' } = {}) {
+      const group = new THREE.Group();
+
+      const uniforms = {
+        uTime: { value: 0 },
+        uColorA: { value: new THREE.Color(colorA) },
+        uColorB: { value: new THREE.Color(colorB) },
+      };
+
+      const material = new THREE.ShaderMaterial({
+        uniforms,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        vertexShader: /* glsl */`
+          varying vec3 vNormal;
+          varying vec3 vViewDir;
+          void main() {
+            vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+            vNormal = normalize(normalMatrix * normal);
+            vViewDir = normalize(-mvPosition.xyz);
+            gl_Position = projectionMatrix * mvPosition;
+          }
+        `,
+        fragmentShader: /* glsl */`
+          uniform float uTime;
+          uniform vec3 uColorA;
+          uniform vec3 uColorB;
+          varying vec3 vNormal;
+          varying vec3 vViewDir;
+          void main() {
+            float fres = pow(1.0 - max(dot(vNormal, vViewDir), 0.0), 2.0);
+            float pulse = 0.5 + 0.5 * sin(uTime * 2.0);
+            vec3 core = mix(uColorA, uColorB, 0.5 + 0.5 * sin(uTime * 0.8 + vNormal.y * 3.0));
+            vec3 col = core * (0.35 + 0.25 * pulse) + fres * (0.9 + 0.5 * pulse);
+            float alpha = clamp(0.35 + fres, 0.0, 1.0);
+            gl_FragColor = vec4(col, alpha);
+          }
+        `,
+      });
+
+      const orb = new THREE.Mesh(new THREE.SphereGeometry(0.55, 32, 32), material);
+      group.add(orb);
+
+      // Colored light so the wisp actually illuminates its surroundings.
+      const light = new THREE.PointLight(new THREE.Color(colorA), 1.2, 9, 2);
+      group.add(light);
+
+      group.position.set(x, y, z);
+
+      const tick = (t) => {
+        uniforms.uTime.value = t;
+        group.position.y = y + Math.sin(t * 1.1) * 0.35;
+        group.position.x = x + Math.sin(t * 0.5) * 0.45;
+        light.intensity = 1.0 + Math.sin(t * 2.0) * 0.5;
+      };
+      return { group, tick };
+    }
+
+    // ---- Rainbow (iteration 6) -------------------------------
+    // Seven colored half-torus arcs (red outermost), standing in
+    // the clearing's sky with a soft opacity shimmer. Returns { group, tick }.
+    function makeRainbow({ x = 0, y = 0, z = -13, radius = 18 } = {}) {
+      const colors = ['#ff4b4b', '#ff9a3d', '#ffe14d', '#5ed66b', '#4db4ff', '#5b6bff', '#9a5bff'];
+      const bandTube = 0.24;
+      const step = 0.46;
+      const group = new THREE.Group();
+      const mats = [];
+      colors.forEach((c, i) => {
+        const r = radius + (colors.length - 1 - i) * step; // red (i=0) gets the largest radius
+        const geo = new THREE.TorusGeometry(r, bandTube, 12, 96, Math.PI);
+        const mat = new THREE.MeshBasicMaterial({
+          color: c, transparent: true, opacity: 0.5, fog: false,
+          side: THREE.DoubleSide, depthWrite: false,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        group.add(mesh);
+        mats.push(mat);
+      });
+      group.position.set(x, y, z);
+      group.rotation.y = 0.45; // angle the arch toward the default camera view
+      group.renderOrder = -1;  // keep it behind the foreground
+
+      const tick = (t) => {
+        const o = 0.45 + Math.sin(t * 0.5) * 0.08;
+        for (const m of mats) m.opacity = o;
+      };
+      return { group, tick };
+    }
+
+    // ============================================================
+    // populateScene — the loop adds new elements in here.
+    // Keep additions self-contained; call logEntry() for each.
+    // ============================================================
+    function populateScene() {
+      // Seed planting: a little clearing ringed with trees.
+      const ring = [
+        { x: -7, z: -5, s: 1.1, hue: '#2f6d34' },
+        { x: -9, z: 2, s: 0.9, hue: '#357a3a' },
+        { x: -4, z: 7, s: 1.05, hue: '#2b6630' },
+        { x: 4, z: 8, s: 1.2, hue: '#327138' },
+        { x: 8, z: 3, s: 1.0, hue: '#2f6d34' },
+        { x: 9, z: -4, s: 0.95, hue: '#3a8040' },
+        { x: 3, z: -8, s: 1.15, hue: '#2b6630' },
+        { x: -3, z: -9, s: 0.85, hue: '#357a3a' },
+      ];
+      const ringTrees = [];
+      for (const t of ring) {
+        const tr = makeTree({ x: t.x, z: t.z, scale: t.s, hue: t.hue });
+        ringTrees.push(tr);
+        scene.add(tr);
+      }
+
+      // A couple of rocks near the clearing's edge.
+      scene.add(makeRock({ x: -2.5, z: 3, scale: 1.3 }));
+      scene.add(makeRock({ x: 2, z: -2, scale: 0.8 }));
+      scene.add(makeRock({ x: 5, z: 1.5, scale: 1.0 }));
+
+      // Iteration 1: a hot-air balloon drifting over the clearing.
+      const balloon = makeBalloon({ x: 0, z: 0, height: 17, colors: ['#e84c3d', '#f4d03f', '#3da5e8'] });
+      scene.add(balloon.group);
+      tickers.push(balloon.tick);
+      logEntry('Iteration 1: a hot-air balloon drifts over the clearing.');
+
+      // Iteration 2: a little pond with a codex-generated water texture.
+      const pond = makePond({ x: -4.5, z: -1.5, radius: 2.6 });
+      scene.add(pond.mesh);
+      tickers.push(pond.tick);
+      logEntry('Iteration 2: a shimmering pond settles into the clearing.');
+
+      // Iteration 3: a flutter of butterflies (loaded from ./modules/butterflies.js).
+      const butterflies = createButterflies(THREE, { count: 7 });
+      scene.add(butterflies.group);
+      tickers.push(butterflies.tick);
+      logEntry('Iteration 3: a flutter of butterflies dances over the clearing.');
+
+      // Iteration 4: a glowing will-o'-the-wisp (custom GLSL shader) over the pond.
+      const wisp = makeWisp({ x: -4.5, y: 2.6, z: -1.5, colorA: '#7df9ff', colorB: '#b06bff' });
+      scene.add(wisp.group);
+      tickers.push(wisp.tick);
+      logEntry('Iteration 4: a glowing will-o\'-the-wisp drifts above the pond (custom shader).');
+
+      // Iteration 5: a low-poly deer grazing at the clearing's edge.
+      const deer = createDeer(THREE, { x: 5.5, z: 4.5, facing: Math.PI * 0.85 });
+      scene.add(deer.group);
+      tickers.push(deer.tick);
+      logEntry('Iteration 5: a deer grazes quietly at the edge of the clearing.');
+
+      // Iteration 6: a rainbow arches over the clearing.
+      const rainbow = makeRainbow({ x: 0, y: 0, z: -13, radius: 18 });
+      scene.add(rainbow.group);
+      tickers.push(rainbow.tick);
+      logEntry('Iteration 6: a rainbow arches over the clearing.');
+
+      // Iteration 7: a full day-night cycle (sun/moon, sky colors, stars, fireflies).
+      const dayNight = createDayNight(THREE, { scene, sun, hemi, env, periodSeconds: 60 });
+      scene.add(dayNight.group);
+      tickers.push(dayNight.tick);
+      logEntry('Iteration 7: day turns to night and back — stars and fireflies after dark.');
+
+      // Iteration 8: a cozy campsite — tent, crackling fire, ember sparks, log seats.
+      const campsite = createCampsite(THREE, { x: 6, z: -6 });
+      scene.add(campsite.group);
+      tickers.push(campsite.tick);
+      logEntry('Iteration 8: a campsite with a crackling fire glows by the trees.');
+
+      // Iteration 9: a flock of birds in V-formation circling the clearing.
+      const birds = createBirds(THREE, { count: 7, radius: 15, height: 12 });
+      scene.add(birds.group);
+      tickers.push(birds.tick);
+      logEntry('Iteration 9: a flock of birds wheels across the sky in a V.');
+
+      // Iteration 10: a cottage whose windows glow warm after dusk (reacts to env).
+      const cottage = createCottage(THREE, { x: -6.5, z: 4.5, facing: Math.atan2(6.5, -4.5), env });
+      scene.add(cottage.group);
+      tickers.push(cottage.tick);
+      logEntry('Iteration 10: a cottage settles in — its windows glow warm at night.');
+
+      // Iteration 11: a waterfall (custom flowing-water shader) tumbling into the pond.
+      const waterfall = createWaterfall(THREE, { x: -7.5, z: -2.7, facing: Math.atan2(3.0, 1.2), height: 2.9 });
+      scene.add(waterfall.group);
+      tickers.push(waterfall.tick);
+      logEntry('Iteration 11: a waterfall spills off the rocks into the pond.');
+
+      // Iteration 12: drifting clouds (lit by the day-night sun, so they dim at night).
+      const clouds = createClouds(THREE, { count: 6 });
+      scene.add(clouds.group);
+      tickers.push(clouds.tick);
+      logEntry('Iteration 12: soft clouds drift high across the sky.');
+
+      // Iteration 13: koi gliding in the pond, with ripple rings.
+      const koi = createKoi(THREE, { center: { x: -4.5, z: -1.5 }, radius: 1.6, count: 5 });
+      scene.add(koi.group);
+      tickers.push(koi.tick);
+      logEntry('Iteration 13: koi glide through the pond, trailing ripples.');
+
+      // Iteration 14: a flower garden bed by the cottage (codex texture + 3D blooms).
+      const garden = createGarden(THREE, { x: -4.6, z: 3.4, texLoader });
+      scene.add(garden.group);
+      tickers.push(garden.tick);
+      logEntry('Iteration 14: a flower garden blooms beside the cottage.');
+
+      // Iteration 15: bioluminescent mushroom clusters that glow at night (reacts to env).
+      const mushrooms = createMushrooms(THREE, {
+        clusters: [{ x: -7.0, z: 0.2 }, { x: 2.8, z: -7.4 }, { x: -1.6, z: 6.2 }],
+        env,
+      });
+      scene.add(mushrooms.group);
+      tickers.push(mushrooms.tick);
+      logEntry('Iteration 15: glowing mushrooms light up the forest floor at night.');
+
+      // Iteration 16: rabbits hopping around the clearing.
+      const rabbits = createRabbits(THREE, { homes: [{ x: 2.2, z: 2.4 }, { x: -1.5, z: -4.5 }, { x: 3.5, z: -2.5 }] });
+      scene.add(rabbits.group);
+      tickers.push(rabbits.tick);
+      logEntry('Iteration 16: rabbits hop and bound across the clearing.');
+
+      // Iteration 17: shooting stars that streak across the night sky (reacts to env).
+      const meteors = createMeteors(THREE, { env, count: 3 });
+      scene.add(meteors.group);
+      tickers.push(meteors.tick);
+      logEntry('Iteration 17: shooting stars streak across the night sky.');
+
+      // Iteration 18: an aurora borealis (custom shader) shimmering at night.
+      const aurora = createAurora(THREE, { env });
+      scene.add(aurora.group);
+      tickers.push(aurora.tick);
+      logEntry('Iteration 18: an aurora shimmers across the northern night sky.');
+
+      // Iteration 19: cherry-blossom petals drifting over the whole clearing.
+      const petals = createPetals(THREE, { count: 70, area: 18, top: 16 });
+      scene.add(petals.group);
+      tickers.push(petals.tick);
+      logEntry('Iteration 19: cherry-blossom petals drift and tumble through the air.');
+
+      // Iteration 20: an arched wooden footbridge over the pond (static geometry).
+      const bridge = createBridge(THREE, { x: -4.5, z: -1.5, facing: Math.PI / 2, span: 5.6, width: 1.3, archH: 0.9 });
+      scene.add(bridge.group);
+      logEntry('Iteration 20: an arched footbridge crosses the pond.');
+
+      // Iteration 21: a turning water wheel at the pond's edge by the waterfall.
+      const waterWheel = createWaterWheel(THREE, { x: -6.0, z: 0.6, facing: 0.93, R: 1.4 });
+      scene.add(waterWheel.group);
+      tickers.push(waterWheel.tick);
+      logEntry('Iteration 21: a water wheel turns slowly at the pond\'s edge.');
+
+      // Iteration 22: festoon string lights between trees, glowing at night (reacts to env).
+      const stringLights = createStringLights(THREE, {
+        anchors: [
+          { x: -9, y: 3.4, z: 2 }, { x: -4, y: 3.8, z: 7 }, { x: 4, y: 3.8, z: 8 },
+          { x: 8, y: 3.6, z: 3 }, { x: 9, y: 3.4, z: -4 },
+        ],
+        env,
+      });
+      scene.add(stringLights.group);
+      tickers.push(stringLights.tick);
+      logEntry('Iteration 22: string lights twinkle between the trees at night.');
+
+      // Iteration 23: an owl roosting on a branch, eyes glowing at night (reacts to env).
+      const owl = createOwl(THREE, { x: 7.2, y: 3.8, z: 3.4, facing: Math.atan2(-7.2, -3.4), env });
+      scene.add(owl.group);
+      tickers.push(owl.tick);
+      logEntry('Iteration 23: an owl watches from a branch, eyes aglow after dark.');
+
+      // Iteration 24: a windmill beyond the trees, its sails turning in the wind.
+      const windmill = createWindmill(THREE, { x: -11, z: -9, facing: Math.atan2(11, 9), height: 5 });
+      scene.add(windmill.group);
+      tickers.push(windmill.tick);
+      logEntry('Iteration 24: a windmill turns its sails beyond the southwest trees.');
+
+      // Iteration 25: a breeze that sways the whole forest.
+      const wind = ringTrees.map((tr, i) => ({ tr, phase: i * 1.3, freq: 0.6 + (i % 3) * 0.15 }));
+      tickers.push((t) => {
+        for (const w of wind) {
+          w.tr.rotation.z = Math.sin(t * w.freq + w.phase) * 0.035;
+          w.tr.rotation.x = Math.cos(t * w.freq * 0.8 + w.phase) * 0.02;
+        }
+      });
+      logEntry('Iteration 25: a breeze sets the whole forest gently swaying.');
+
+      // Iteration 26: a fox trotting a loop through the open clearing.
+      const fox = createFox(THREE, { center: { x: 0.5, z: 6 }, radius: 2.4, speed: 0.45 });
+      scene.add(fox.group);
+      tickers.push(fox.tick);
+      logEntry('Iteration 26: a fox trots a circuit through the clearing.');
+
+      // Iteration 27: dragonflies darting over the pond.
+      const dragonflies = createDragonflies(THREE, { center: { x: -4.5, z: -1.5 }, radius: 1.8, count: 4, baseY: 1.0 });
+      scene.add(dragonflies.group);
+      tickers.push(dragonflies.tick);
+      logEntry('Iteration 27: dragonflies dart and hover over the pond.');
+
+      // Iteration 28: cattail reeds swaying around the pond's bank.
+      const reeds = createReeds(THREE, { center: { x: -4.5, z: -1.5 }, radius: 2.95, count: 8 });
+      scene.add(reeds.group);
+      tickers.push(reeds.tick);
+      logEntry('Iteration 28: cattail reeds sway around the pond\'s edge.');
+
+      // Iteration 29: a rope swing hung from a tree branch, gently swinging.
+      const swing = createSwing(THREE, { anchor: { x: 4, y: 2.9, z: 5.6 }, ropeLen: 1.7, fromZ: 7.4 });
+      scene.add(swing.group);
+      tickers.push(swing.tick);
+      logEntry('Iteration 29: a rope swing sways from a tree at the clearing\'s edge.');
+
+      // Iteration 30: lily pads floating on the pond.
+      const lilyPads = createLilyPads(THREE, { center: { x: -4.5, z: -1.5 }, radius: 1.9, count: 6 });
+      scene.add(lilyPads.group);
+      tickers.push(lilyPads.tick);
+      logEntry('Iteration 30: lily pads float and bob on the pond.');
+
+      // Iteration 31: a scarecrow standing guard by the garden.
+      const scarecrow = createScarecrow(THREE, { x: -3.0, z: 4.6, facing: Math.atan2(3.0, -4.6) });
+      scene.add(scarecrow.group);
+      tickers.push(scarecrow.tick);
+      logEntry('Iteration 31: a scarecrow keeps watch over the garden.');
+
+      // Iteration 32: bees buzzing over the flower garden.
+      const bees = createBees(THREE, { center: { x: -4.6, z: 3.4 }, area: { x: 1.4, z: 0.9 }, count: 6, baseY: 0.8 });
+      scene.add(bees.group);
+      tickers.push(bees.tick);
+      logEntry('Iteration 32: bees buzz busily over the flower garden.');
+
+      // Iteration 33: a stone wishing well in the clearing.
+      const well = createWell(THREE, { x: 1.5, z: 4.6, facing: 0.3 });
+      scene.add(well.group);
+      tickers.push(well.tick);
+      logEntry('Iteration 33: a stone wishing well stands in the clearing.');
+    }
+
+    populateScene();
+
+    // ---- Resize ----------------------------------------------
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // ---- Render loop -----------------------------------------
+    const clock = new THREE.Clock();
+    function animate() {
+      requestAnimationFrame(animate);
+      const t = clock.getElapsedTime();
+      // expose elapsed time for any animated additions the loop makes
+      window.__sceneTime = t;
+      for (const tick of tickers) tick(t);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // expose core objects so loop-added code can hook in
+    window.__forest = { THREE, scene, camera, renderer, controls, texLoader, tickers, makeTree, makeRock, makeBalloon, makePond, makeWisp };
+  </script>
+</body>
+</html>

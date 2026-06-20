@@ -16,18 +16,18 @@ document.body.appendChild(renderer.domElement);
 // ---- Scene + base sky/fog (the day-night component overrides these once revealed) ----
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#87b9e0');
-scene.fog = new THREE.Fog('#9fc6e6', 28, 70);
+scene.fog = new THREE.Fog('#9fc6e6', 42, 115);
 
 // ---- Camera ----
-const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
-camera.position.set(10, 7, 14);
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 260);
+camera.position.set(17, 12, 24);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.06;
 controls.maxPolarAngle = Math.PI / 2 - 0.04;
 controls.minDistance = 5;
-controls.maxDistance = 45;
+controls.maxDistance = 70;
 controls.target.set(0, 1, 0);
 controls.autoRotate = true;
 controls.autoRotateSpeed = 0.35;
@@ -51,7 +51,7 @@ scene.add(sun);
 
 // ---- Ground ----
 const ground = new THREE.Mesh(
-  new THREE.CircleGeometry(40, 64),
+  new THREE.CircleGeometry(55, 64),
   new THREE.MeshStandardMaterial({ color: '#5a8c3e', roughness: 1 }),
 );
 ground.rotation.x = -Math.PI / 2;

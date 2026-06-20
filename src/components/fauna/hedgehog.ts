@@ -74,8 +74,8 @@ export const hedgehog: Component = {
       body.add(foot);
     }
 
-    const center = { x: 1.5, z: -3 };
-    const pathR = 1.3;
+    const center = { x: 2.55, z: -5.1 };
+    const pathR = 1.6;
     root.position.set(center.x, 0, center.z);
 
     let moveT = 0;   // waddle phase (pauses while curled)

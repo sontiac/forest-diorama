@@ -52,7 +52,7 @@ export const lamppost: Component = {
     lantern.add(light);
     group.add(lantern);
 
-    group.position.set(-2.0, 0, 6.2);
+    group.position.set(-3.4, 0, 10.5);
 
     function update(t: number) {
       const n = env.night01 ?? 0;

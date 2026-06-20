@@ -19,7 +19,7 @@ export const sunflowers: Component = {
     let seed = 12.3;
     const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
 
-    const center = { x: -1.5, z: 7.5 };
+    const center = { x: -2.55, z: 12.75 };
     for (let i = 0; i < 5; i++) {
       const h = 1.2 + rnd() * 0.5;
       const root = new THREE.Group();

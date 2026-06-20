@@ -8,7 +8,7 @@ export const kite: Component = {
   create(ctx: Ctx) {
     const { THREE } = ctx;
     const group = new THREE.Group();
-    const anchor = new THREE.Vector3(3, 0.05, 5);
+    const anchor = new THREE.Vector3(5.1, 0.05, 8.5);
 
     // Ground peg the string is tied to.
     const peg = new THREE.Mesh(
@@ -64,9 +64,9 @@ export const kite: Component = {
     group.add(string);
 
     function update(t: number) {
-      const kx = 5 + Math.sin(t * 0.35) * 1.6;
-      const ky = 7.5 + Math.sin(t * 0.6) * 0.7;
-      const kz = 8 + Math.cos(t * 0.45) * 1.3;
+      const kx = 8.5 + Math.sin(t * 0.35) * 2.2;
+      const ky = 8.0 + Math.sin(t * 0.6) * 0.7;
+      const kz = 13.6 + Math.cos(t * 0.45) * 1.8;
       kiteObj.position.set(kx, ky, kz);
       kiteObj.lookAt(anchor.x, anchor.y, anchor.z); // lean toward the tether
 

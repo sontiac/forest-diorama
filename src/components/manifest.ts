@@ -22,6 +22,7 @@ import { turtle } from './fauna/turtle';
 import { kite } from './sky/kite';
 import { hedgehog } from './fauna/hedgehog';
 import { lamppost } from './structures/lamppost';
+import { sunflowers } from './flora/sunflowers';
 // Water
 import { makePond } from './water/pond.js';
 import { createWaterfall } from './water/waterfall.js';
@@ -347,4 +348,5 @@ export const manifest: Component[] = [
   kite,
   hedgehog,
   lamppost,
+  sunflowers,
 ];

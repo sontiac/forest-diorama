@@ -20,6 +20,7 @@ import { createBees } from './fauna/bees.js';
 import { createFrogs } from './fauna/frogs.js';
 import { turtle } from './fauna/turtle';
 import { kite } from './sky/kite';
+import { hedgehog } from './fauna/hedgehog';
 // Water
 import { makePond } from './water/pond.js';
 import { createWaterfall } from './water/waterfall.js';
@@ -343,4 +344,5 @@ export const manifest: Component[] = [
   },
   turtle, // native TypeScript component — already a Component, no wrapper needed
   kite,
+  hedgehog,
 ];

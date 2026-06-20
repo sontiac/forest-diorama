@@ -50,9 +50,14 @@ sun.shadow.bias = -0.0004;
 scene.add(sun);
 
 // ---- Ground ----
+const grassTex = new THREE.TextureLoader().load('./assets/grass.png');
+grassTex.colorSpace = THREE.SRGBColorSpace;
+grassTex.wrapS = THREE.RepeatWrapping;
+grassTex.wrapT = THREE.RepeatWrapping;
+grassTex.repeat.set(16, 16);
 const ground = new THREE.Mesh(
   new THREE.CircleGeometry(55, 64),
-  new THREE.MeshStandardMaterial({ color: '#5a8c3e', roughness: 1 }),
+  new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1 }),
 );
 ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;

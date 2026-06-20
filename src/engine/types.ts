@@ -17,7 +17,7 @@ export type ComponentApi = Record<string, unknown>;
 export interface World {
   readonly pond: { center: { x: number; z: number }; radius: number };
   readonly clearing: { radius: number };
-  readonly trees: ReadonlyArray<{ x: number; z: number; scale: number; hue: string }>;
+  readonly trees: ReadonlyArray<{ x: number; z: number; scale: number; hue: string; kind?: 'conifer' | 'round' }>;
   register(id: string, api: ComponentApi): void;
   get<T extends ComponentApi = ComponentApi>(id: string): T | undefined;
 }

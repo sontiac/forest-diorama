@@ -99,22 +99,18 @@ export function createCottage(THREE, { x = 0, z = 0, facing = 0, env = { night01
   chimney.castShadow = true;
   group.add(chimney);
 
-  // ---- Chimney smoke ----
-  const sCount = 18;
-  const smoke = [];
-  const sPos = new Float32Array(sCount * 3);
-  for (let i = 0; i < sCount; i++) {
-    smoke.push({ speed: 0.25 + Math.random() * 0.25, yoff: Math.random() * 3, sway: Math.random() * 6.28 });
-  }
-  const sGeo = new THREE.BufferGeometry();
-  sGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
-  const sMat = new THREE.PointsMaterial({
-    color: '#c9cdd2', size: 0.4, sizeAttenuation: true, transparent: true,
-    opacity: 0.4, depthWrite: false,
-  });
-  const smokePoints = new THREE.Points(sGeo, sMat);
-  group.add(smokePoints);
+  // ---- Chimney smoke (soft puffs that swell and fade as they rise) ----
   const chimneyTop = new THREE.Vector3(0.9, H + 1.2, 0.5);
+  const puffLife = 3.6;
+  const puffs = [];
+  const puffGeo = new THREE.SphereGeometry(0.16, 8, 7);
+  for (let i = 0; i < 12; i++) {
+    const mat = new THREE.MeshStandardMaterial({ color: '#cfd3d8', transparent: true, opacity: 0, roughness: 1, depthWrite: false });
+    const puff = new THREE.Mesh(puffGeo, mat);
+    puff.position.copy(chimneyTop);
+    group.add(puff);
+    puffs.push({ puff, mat, speed: 0.5 + Math.random() * 0.3, yoff: (i / 12) * puffLife, sway: Math.random() * 6.28 });
+  }
 
   // ---- Interior light (on at night) ----
   const inLight = new THREE.PointLight('#ffcf87', 0, 7, 2);
@@ -129,16 +125,18 @@ export function createCottage(THREE, { x = 0, z = 0, facing = 0, env = { night01
     for (const m of glowMats) m.emissiveIntensity = n * 1.4;
     inLight.intensity = n * 1.8;
 
-    // Smoke rises from the chimney and recycles.
-    const arr = sGeo.attributes.position.array;
-    for (let i = 0; i < sCount; i++) {
-      const s = smoke[i];
-      const life = (t * s.speed + s.yoff) % 3.2;
-      arr[i * 3 + 0] = chimneyTop.x + Math.sin(t * 0.8 + s.sway) * 0.25 * life;
-      arr[i * 3 + 1] = chimneyTop.y + life;
-      arr[i * 3 + 2] = chimneyTop.z + Math.cos(t * 0.7 + s.sway) * 0.25 * life;
+    // Chimney smoke: each puff rises, swells, and fades, then recycles.
+    for (const p of puffs) {
+      const life = (t * p.speed + p.yoff) % puffLife;
+      const k = life / puffLife;
+      p.puff.position.set(
+        chimneyTop.x + Math.sin(t * 0.7 + p.sway) * 0.45 * k,
+        chimneyTop.y + life * 0.95,
+        chimneyTop.z + Math.cos(t * 0.6 + p.sway) * 0.45 * k,
+      );
+      p.puff.scale.setScalar(0.4 + k * 1.7);
+      p.mat.opacity = 0.55 * Math.max(0, 1 - k);
     }
-    sGeo.attributes.position.needsUpdate = true;
   }
 
   return { group, tick };

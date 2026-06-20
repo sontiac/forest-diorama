@@ -12,7 +12,7 @@ export function createWell(THREE, { x = 0, z = 0, facing = 0, texLoader = null, 
   const woodMat = new THREE.MeshStandardMaterial({ color: '#6b4423', roughness: 0.9, flatShading: true });
   const roofMat = new THREE.MeshStandardMaterial({ color: '#8a4a32', roughness: 0.9, flatShading: true });
   const ropeMat = new THREE.MeshStandardMaterial({ color: '#cbb487', roughness: 1 });
-  const waterMat = new THREE.MeshStandardMaterial({ color: '#1d3a4a', roughness: 0.3, metalness: 0.1 });
+  const waterMat = new THREE.MeshStandardMaterial({ color: '#2f6e8a', roughness: 0.15, metalness: 0.45 });
 
   // Brick wall material (falls back to stone if no loader provided).
   let wallMat = stoneMat;
@@ -25,19 +25,30 @@ export function createWell(THREE, { x = 0, z = 0, facing = 0, texLoader = null, 
     wallMat = new THREE.MeshStandardMaterial({ map: brick, roughness: 0.95 });
   }
 
-  // Brick wall + stone capstone rim + water.
-  const wall = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.86, 0.8, 24), wallMat);
-  wall.position.y = 0.4;
+  // Brick wall — open-topped so you can see down the shaft.
+  wallMat.side = THREE.DoubleSide;
+  const wall = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.86, 0.85, 24, 1, true), wallMat);
+  wall.position.y = 0.42;
   wall.castShadow = true;
   wall.receiveShadow = true;
   group.add(wall);
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.8, 0.08, 8, 16), stoneMat);
+
+  // Dark inner shaft so the well reads as deep and hollow.
+  const shaftMat = new THREE.MeshStandardMaterial({ color: '#241f1a', roughness: 1, side: THREE.DoubleSide });
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.85, 20, 1, true), shaftMat);
+  shaft.position.y = 0.42;
+  group.add(shaft);
+
+  // Stone capstone rim.
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.8, 0.09, 8, 18), stoneMat);
   rim.rotation.x = Math.PI / 2;
-  rim.position.y = 0.8;
+  rim.position.y = 0.86;
   group.add(rim);
-  const water = new THREE.Mesh(new THREE.CircleGeometry(0.72, 16), waterMat);
+
+  // Water resting down in the shaft.
+  const water = new THREE.Mesh(new THREE.CircleGeometry(0.68, 20), waterMat);
   water.rotation.x = -Math.PI / 2;
-  water.position.y = 0.55;
+  water.position.y = 0.3;
   group.add(water);
 
   // Posts.
@@ -99,7 +110,7 @@ export function createWell(THREE, { x = 0, z = 0, facing = 0, texLoader = null, 
   });
   const ripple = new THREE.Mesh(new THREE.RingGeometry(0.45, 0.55, 24), rippleMat);
   ripple.rotation.x = -Math.PI / 2;
-  ripple.position.y = 0.56;
+  ripple.position.y = 0.32;
   ripple.visible = false;
   group.add(ripple);
 
@@ -118,7 +129,7 @@ export function createWell(THREE, { x = 0, z = 0, facing = 0, texLoader = null, 
         // Coin arcs from the rim down into the water.
         const k = tossT / 0.6;
         coin.visible = true;
-        coin.position.set(0.3 * (1 - k), 1.05 - (1.05 - 0.56) * k + Math.sin(k * Math.PI) * 0.15, 0.3 * (1 - k));
+        coin.position.set(0.3 * (1 - k), 1.05 - (1.05 - 0.34) * k + Math.sin(k * Math.PI) * 0.15, 0.3 * (1 - k));
         coin.rotation.x += (dt || 0.016) * 16;
         coin.rotation.z += (dt || 0.016) * 9;
       } else if (tossT < 1.5) {
